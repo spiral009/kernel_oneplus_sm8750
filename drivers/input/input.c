@@ -348,30 +348,9 @@ static int input_get_disposition(struct input_dev *dev,
 	return disposition;
 }
 
-#ifdef CONFIG_KSU_SUSFS
-extern struct static_key_true ksu_is_input_hook_enabled;
-extern __attribute__((cold)) int ksu_handle_input_handle_event(
-			unsigned int *type, unsigned int *code, int *value);
-#endif
-
-static void input_handle_event(struct input_dev *dev,
-			       unsigned int type, unsigned int code, int value)
+static void input_event_dispose(struct input_dev *dev, int disposition,
+				unsigned int type, unsigned int code, int value)
 {
-	int disposition;
-
-	/* filter-out events from inhibited devices */
-	if (dev->inhibited)
-		return;
-
-	disposition = input_get_disposition(dev, type, code, &value);
-#ifdef CONFIG_KSU_SUSFS
-	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
-		ksu_handle_input_handle_event(&type, &code, &value);
-#endif
-
-	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
-		add_input_randomness(type, code, value);
-		
 	if ((disposition & INPUT_PASS_TO_DEVICE) && dev->event)
 		dev->event(dev, type, code, value);
 
@@ -413,7 +392,7 @@ static void input_handle_event(struct input_dev *dev,
 }
 
 #ifdef CONFIG_KSU_SUSFS
-extern bool ksu_input_hook __read_mostly;
+extern struct static_key_true ksu_is_input_hook_enabled;
 extern __attribute__((cold)) int ksu_handle_input_handle_event(
 			unsigned int *type, unsigned int *code, int *value);
 #endif
@@ -427,7 +406,7 @@ void input_handle_event(struct input_dev *dev,
 
 	disposition = input_get_disposition(dev, type, code, &value);
 #ifdef CONFIG_KSU_SUSFS
-	if (unlikely(ksu_input_hook))
+	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
 		ksu_handle_input_handle_event(&type, &code, &value);
 #endif
 	if (disposition != INPUT_IGNORE_EVENT) {
