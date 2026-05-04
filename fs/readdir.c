@@ -245,9 +245,6 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 		.ctx.actor = fillonedir,
 		.dirent = dirent
 	};
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-	struct inode *inode;
-#endif
 
 	if (!f.file)
 		return -EBADF;
@@ -256,6 +253,7 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	buf.sb = f.file->f_inode->i_sb;
 	buf.idmap = mnt_idmap(f.file->f_path.mnt);
 #endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
@@ -373,6 +371,7 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	buf.sb = f.file->f_inode->i_sb;
 	buf.idmap = mnt_idmap(f.file->f_path.mnt);
 #endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -480,6 +479,7 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 	buf.sb = f.file->f_inode->i_sb;
 	buf.idmap = mnt_idmap(f.file->f_path.mnt);
 #endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -585,6 +585,7 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	buf.sb = f.file->f_inode->i_sb;
 	buf.idmap = mnt_idmap(f.file->f_path.mnt);
 #endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
@@ -694,6 +695,7 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	buf.sb = f.file->f_inode->i_sb;
 	buf.idmap = mnt_idmap(f.file->f_path.mnt);
 #endif
+
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;

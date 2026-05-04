@@ -101,32 +101,16 @@
 #include <linux/ksm.h>
 #include <linux/cpufreq_times.h>
 #include <linux/dma-buf.h>
-#include <trace/events/oom.h>
-#include <trace/hooks/sched.h>
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 #include <linux/susfs_def.h>
 #endif
 
+#include <trace/events/oom.h>
+#include <trace/hooks/sched.h>
 #include "internal.h"
 #include "fd.h"
 
 #include "../../lib/kstrtox.h"
-
-
-struct task_kill_info {
-	struct task_struct *task;
-	struct work_struct work;
-};
-
-static void proc_kill_task(struct work_struct *work)
-{
-	struct task_kill_info *kinfo = container_of(work, typeof(*kinfo), work);
-	struct task_struct *task = kinfo->task;
-
-	send_sig(SIGKILL, task, 0);
-	put_task_struct(task);
-	kfree(kinfo);
-}
 
 /* NOTE:
  *	Implementing inode permission operations in /proc is almost
@@ -934,9 +918,6 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 	ssize_t copied;
 	char *page;
 	unsigned int flags;
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-	struct vm_area_struct *vma;
-#endif
 
 	if (!mm)
 		return 0;
@@ -956,12 +937,11 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 	while (count > 0) {
 		size_t this_len = min_t(size_t, count, PAGE_SIZE);
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		struct vm_area_struct *vma;
 		vma = find_vma(mm, addr);
 		if (vma && vma->vm_file) {
 			struct inode *inode = file_inode(vma->vm_file);
-			if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags) &&
-				susfs_is_current_proc_umounted()))
-			{
+			if (SUSFS_IS_INODE_SUS_MAP(inode)) {
 				if (write) {
 					copied = -EFAULT;
 				} else {
@@ -1175,7 +1155,6 @@ static ssize_t oom_adj_read(struct file *file, char __user *buf, size_t count,
 static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 {
 	struct mm_struct *mm = NULL;
- 	char task_comm[TASK_COMM_LEN];
 	struct task_struct *task;
 	int err = 0;
 
@@ -1226,8 +1205,6 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 	if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_adj;
 	trace_oom_score_adj_update(task);
-	if (oom_adj >= 700)
-		strncpy(task_comm, task->comm, TASK_COMM_LEN);
 
 	if (mm) {
 		struct task_struct *p;
@@ -1255,20 +1232,6 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 err_unlock:
 	mutex_unlock(&oom_adj_mutex);
 	put_task_struct(task);
-	/* These apps burn through CPU in the background. Don't let them. */
-	if (!err && oom_adj >= 700) {
-		if (!strcmp(task_comm, "id.GoogleCamera")) {
-			struct task_kill_info *kinfo;
-
-			kinfo = kmalloc(sizeof(*kinfo), GFP_KERNEL);
-			if (kinfo) {
-				get_task_struct(task);
-				kinfo->task = task;
-				INIT_WORK(&kinfo->work, proc_kill_task);
-				schedule_work(&kinfo->work);
-			}
-		}
-	}
 	return err;
 }
 
@@ -1893,6 +1856,10 @@ out:
 	return ERR_PTR(error);
 }
 
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+extern int susfs_open_redirect_spoof_do_proc_readlink(struct inode *inode, char *tmp_buf, int buflen);
+#endif
+
 static int do_proc_readlink(const struct path *path, char __user *buffer, int buflen)
 {
 	char *tmp = kmalloc(PATH_MAX, GFP_KERNEL);
@@ -1901,6 +1868,18 @@ static int do_proc_readlink(const struct path *path, char __user *buffer, int bu
 
 	if (!tmp)
 		return -ENOMEM;
+
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+	if (SUSFS_IS_INODE_OPEN_REDIRECT(path->dentry->d_inode)) {
+		if (!susfs_open_redirect_spoof_do_proc_readlink(path->dentry->d_inode, tmp, buflen)) {
+			len = strlen(tmp);
+			if (copy_to_user(buffer, tmp, len))
+				len = -EFAULT;
+			kfree(tmp);
+			return len;
+		}
+	}
+#endif
 
 	pathname = d_path(path, tmp, PATH_MAX);
 	len = PTR_ERR(pathname);
@@ -2481,6 +2460,9 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	struct map_files_info *p;
 	int ret;
 	struct vma_iterator vmi;
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	struct inode *inode;
+#endif
 
 	genradix_init(&fa);
 
@@ -2525,11 +2507,9 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 		if (!vma->vm_file)
 			continue;
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (unlikely(test_bit(AS_FLAGS_SUS_MAP, &file_inode(vma->vm_file)->i_mapping->flags) &&
-			susfs_is_current_proc_umounted()))
-		{
+		inode = file_inode(vma->vm_file);
+		if (SUSFS_IS_INODE_SUS_MAP(inode))
 			continue;
-		}
 #endif
 		if (++pos <= ctx->pos)
 			continue;
