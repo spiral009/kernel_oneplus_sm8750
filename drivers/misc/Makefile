@@ -73,4 +73,5 @@ obj-$(CONFIG_QSEECOM_PROXY) 	+= qseecom_proxy.o
 obj-$(CONFIG_HAPTIC_FEEDBACK) += vibrator/haptic_feedback/
 obj-$(CONFIG_OPLUS_HAPTIC_COMMON) += vibrator/oplus_haptic/
 #endif
+obj-$(CONFIG_NTSYNC)		+= ntsync.o
 obj-$(CONFIG_PKVM_SMC_FILTER)  += pkvm-smc/
