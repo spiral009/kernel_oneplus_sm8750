@@ -36,7 +36,11 @@ struct user_struct {
 	/* Miscellaneous per-user rate limit */
 	struct ratelimit_state ratelimit;
 
+#if defined(CONFIG_POSIX_MQUEUE)
+	ANDROID_KABI_USE(1, unsigned long mq_bytes);
+#else
 	ANDROID_KABI_RESERVE(1);
+#endif
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_OEM_DATA_ARRAY(1, 2);
 };
