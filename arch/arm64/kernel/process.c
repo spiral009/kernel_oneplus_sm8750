@@ -36,6 +36,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/personality.h>
 #include <linux/notifier.h>
+#include <linux/panic.h>
 #include <trace/events/power.h>
 #include <linux/percpu.h>
 #include <linux/thread_info.h>
@@ -129,7 +130,12 @@ void machine_restart(char *cmd)
 {
 	/* Disable interrupts first */
 	local_irq_disable();
-	smp_send_stop();
+	/*
+	 * Skip stopping CPUs during panic to avoid hangs when a CPU
+	 * is unresponsive. The watchdog or PSCI reset will handle cleanup.
+	 */
+	if (atomic_read(&panic_cpu) == PANIC_CPU_INVALID)
+		smp_send_stop();
 
 	/*
 	 * UpdateCapsule() depends on the system being reset via
