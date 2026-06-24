@@ -4,13 +4,19 @@
 #
 
 ccflags-y += -I $(srctree)/$(src)
+# KVM-under-Gunyah: gunyah.c includes the Gunyah RM private headers
+ccflags-y += -I$(srctree)/drivers/virt/gunyah
 
 include $(srctree)/virt/kvm/Makefile.kvm
 
 obj-$(CONFIG_KVM) += kvm.o
-obj-$(CONFIG_KVM) += hyp/
+obj-$(CONFIG_KVM_ARM) += hyp/
 
-kvm-y += arm.o mmu.o mmio.o psci.o hypercalls.o pvtime.o \
+# KVM-under-Gunyah backend: kvm.o = virt/kvm core + gunyah.o
+kvm-$(CONFIG_GUNYAH) += gunyah.o
+
+# Native EL2 KVM objects (only when not building under Gunyah)
+kvm-$(CONFIG_KVM_ARM) += arm.o mmu.o mmio.o psci.o hypercalls.o pvtime.o \
 	 inject_fault.o va_layout.o handle_exit.o \
 	 guest.o debug.o reset.o sys_regs.o stacktrace.o \
 	 vgic-sys-reg-v3.o fpsimd.o pkvm.o \
@@ -22,6 +28,7 @@ kvm-y += arm.o mmu.o mmio.o psci.o hypercalls.o pvtime.o \
 	 vgic/vgic-mmio-v3.o vgic/vgic-kvm-device.o \
 	 vgic/vgic-its.o vgic/vgic-debug.o iommu.o
 
+ifeq ($(CONFIG_KVM_ARM),y)
 kvm-$(CONFIG_HW_PERF_EVENTS)  += pmu-emul.o pmu.o
 kvm-$(CONFIG_PTDUMP_STAGE2_DEBUGFS) += ptdump.o
 
@@ -42,3 +49,4 @@ $(obj)/hyp_constants.h: $(obj)/hyp-constants.s FORCE
 
 obj-kvm := $(addprefix $(obj)/, $(kvm-y))
 $(obj-kvm): $(obj)/hyp_constants.h
+endif

@@ -8,6 +8,8 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 
+int kvm_gunyah_init(void);
+
 static int gunyah_probe(struct platform_device *pdev)
 {
 	struct gunyah_hypercall_hyp_identify_resp gunyah_api;
@@ -27,6 +29,9 @@ static int gunyah_probe(struct platform_device *pdev)
 			gunyah_api_version(&gunyah_api));
 		return -ENODEV;
 	}
+
+	if (!kvm_gunyah_init())
+		pr_info("KVM for Gunyah is available!\n");
 
 	return devm_of_platform_populate(&pdev->dev);
 }

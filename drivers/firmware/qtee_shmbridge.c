@@ -313,7 +313,14 @@ int32_t qtee_shmbridge_register(
 		 * owner bit to be set.
 		 */
 
-		if (ns_vmid_num == 1) {
+		/*
+		 * KVM-under-Gunyah: gh_rm_get_this_vmid() lives in the vendor RM
+		 * module (gh_rm_drv); this file is built-in once QCOM_SCM=y (forced
+		 * by GUNYAH_QCOM_PLATFORM=y). Guard with IS_REACHABLE so the built-in
+		 * path skips this self-owner-VMID optimization rather than referencing
+		 * an unresolvable module symbol.
+		 */
+		if (IS_REACHABLE(CONFIG_GH_RM_DRV) && ns_vmid_num == 1) {
 			if (!gh_rm_get_this_vmid(&temp_vmid) &&
 				(temp_vmid == ns_vmid_list[0])) {
 

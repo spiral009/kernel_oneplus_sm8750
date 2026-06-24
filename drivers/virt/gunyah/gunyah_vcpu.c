@@ -13,6 +13,8 @@
 #include <linux/types.h>
 #include <linux/wait.h>
 
+/* Use this file's own struct gunyah_vcpu, not afr0ck's KVM one in vm_mgr.h */
+#define GUNYAH_VCPU_OEM_IMPL
 #include "vm_mgr.h"
 
 #include <uapi/linux/gunyah.h>

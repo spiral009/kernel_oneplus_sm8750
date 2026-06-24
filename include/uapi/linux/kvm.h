@@ -86,6 +86,12 @@ struct kvm_debug_guest {
 /* *** End of deprecated interfaces *** */
 
 
+/* for KVM_SET_DTB_ADDRESS (KVM-under-Gunyah) */
+struct kvm_dtb {
+	__u64 guest_phys_addr;
+	__u64 size;
+};
+
 /* for KVM_SET_USER_MEMORY_REGION */
 struct kvm_userspace_memory_region {
 	__u32 slot;
@@ -1491,6 +1497,8 @@ struct kvm_s390_ucas_mapping {
 #define KVM_S390_UCAS_MAP        _IOW(KVMIO, 0x50, struct kvm_s390_ucas_mapping)
 #define KVM_S390_UCAS_UNMAP      _IOW(KVMIO, 0x51, struct kvm_s390_ucas_mapping)
 #define KVM_S390_VCPU_FAULT	 _IOW(KVMIO, 0x52, unsigned long)
+/* KVM-under-Gunyah: set guest DTB address (0x50 unused on arm64) */
+#define KVM_SET_DTB_ADDRESS      _IOW(KVMIO, 0x50, struct kvm_dtb)
 
 /* Device model IOC */
 #define KVM_CREATE_IRQCHIP        _IO(KVMIO,   0x60)

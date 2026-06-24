@@ -3229,7 +3229,12 @@ static void verify_hyp_capabilities(void)
 	int parange, ipa_max;
 	unsigned int safe_vmid_bits, vmid_bits;
 
-	if (!IS_ENABLED(CONFIG_KVM))
+	/*
+	 * KVM-under-Gunyah: get_kvm_ipa_limit() lives in the native KVM
+	 * (reset.c), which is not built. This native-hypervisor capability
+	 * check is irrelevant when Linux runs as a Gunyah guest.
+	 */
+	if (!IS_ENABLED(CONFIG_KVM_ARM))
 		return;
 
 	safe_mmfr1 = read_sanitised_ftr_reg(SYS_ID_AA64MMFR1_EL1);

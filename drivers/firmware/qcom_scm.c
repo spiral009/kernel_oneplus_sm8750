@@ -1276,7 +1276,15 @@ int qcom_scm_assign_mem(phys_addr_t mem_addr, size_t mem_sz,
 	int ret, i, b;
 	u64 srcvm_bits = *srcvm;
 
-	if (!gh_rm_needs_scm_assign(srcvm, newvm, dest_cnt))
+	/*
+	 * KVM-under-Gunyah: GUNYAH_QCOM_PLATFORM=y forces QCOM_SCM=y (built-in),
+	 * but the vendor RM (gh_rm_drv) that defines gh_rm_needs_scm_assign() is
+	 * a module. Use IS_REACHABLE so the built-in path falls back to always
+	 * performing the SCM assign (the pre-Gunyah-optimization default) instead
+	 * of referencing an unresolvable module symbol.
+	 */
+	if (IS_REACHABLE(CONFIG_GH_RM_DRV) &&
+	    !gh_rm_needs_scm_assign(srcvm, newvm, dest_cnt))
 		return 0;
 
 	src_sz = hweight64(srcvm_bits) * sizeof(*src);

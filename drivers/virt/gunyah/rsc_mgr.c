@@ -147,6 +147,13 @@ struct gunyah_rm {
 	struct fwnode_handle *parent_fwnode;
 };
 
+/*
+ * KVM-under-Gunyah: single resource manager instance, used by
+ * kvm_arch_alloc_vm() (arch/arm64/kvm/gunyah.c) to create VMs.
+ * Built-in (CONFIG_GUNYAH=y), so a plain global suffices for linkage.
+ */
+struct gunyah_rm *gunyah_rm;
+
 /**
  * gunyah_rm_error_remap() - Remap Gunyah resource manager errors into a Linux error code
  * @rm_error: "Standard" return value from Gunyah resource manager
@@ -685,6 +692,10 @@ EXPORT_SYMBOL_GPL(gunyah_rm_put);
 static long gunyah_dev_ioctl(struct file *filp, unsigned int cmd,
 			     unsigned long arg)
 {
+	/*
+	 * Hybrid: keep the native /dev/gunyah VM-manager interface (vm_mgr.c)
+	 * alongside the KVM-under-Gunyah /dev/kvm path. crosvm drives this.
+	 */
 	struct miscdevice *miscdev = filp->private_data;
 	struct gunyah_rm *rm = container_of(miscdev, struct gunyah_rm, miscdev);
 
@@ -795,6 +806,9 @@ static int gunyah_rm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rm);
 	rm->dev = &pdev->dev;
+
+	/* KVM-under-Gunyah: publish the RM instance for kvm_arch_alloc_vm() */
+	gunyah_rm = rm;
 
 	mutex_init(&rm->send_lock);
 	init_completion(&rm->send_ready);

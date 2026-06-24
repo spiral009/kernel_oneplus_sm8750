@@ -34,7 +34,12 @@ PROVIDE(__pi___memcpy			= __pi_memcpy);
 PROVIDE(__pi___memmove			= __pi_memmove);
 PROVIDE(__pi___memset			= __pi_memset);
 
-#ifdef CONFIG_KVM
+/*
+ * KVM-under-Gunyah: these nVHE aliases belong to the native EL2 hypervisor
+ * (arm.c + hyp/), which is not built under Gunyah. Gate on CONFIG_KVM_ARM
+ * (native KVM) rather than CONFIG_KVM (which is the Gunyah backend here).
+ */
+#ifdef CONFIG_KVM_ARM
 
 /*
  * KVM nVHE code has its own symbol namespace prefixed with __kvm_nvhe_, to
@@ -113,7 +118,7 @@ KVM_NVHE_ALIAS(__hyp_printk_fmts_start);
 /* pKVM static key */
 KVM_NVHE_ALIAS(kvm_protected_mode_initialized);
 
-#endif /* CONFIG_KVM */
+#endif /* CONFIG_KVM_ARM */
 
 #ifdef CONFIG_EFI_ZBOOT
 _kernel_codesize = ABSOLUTE(__inittext_end - _text);

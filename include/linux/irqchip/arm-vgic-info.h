@@ -36,7 +36,12 @@ struct gic_kvm_info {
 	bool		no_hw_deactivation;
 };
 
-#ifdef CONFIG_KVM
+/*
+ * KVM-under-Gunyah: the native vGIC (vgic-init.c) is not built; Linux is a
+ * Gunyah guest and the hypervisor owns the vGIC. Use the no-op stub unless
+ * native KVM (CONFIG_KVM_ARM) is enabled.
+ */
+#ifdef CONFIG_KVM_ARM
 void vgic_set_kvm_info(const struct gic_kvm_info *info);
 #else
 static inline void vgic_set_kvm_info(const struct gic_kvm_info *info) {}

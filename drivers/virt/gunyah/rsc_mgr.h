@@ -14,6 +14,9 @@
 
 struct gunyah_rm;
 
+/* KVM-under-Gunyah: global RM instance (defined in rsc_mgr.c) */
+extern struct gunyah_rm *gunyah_rm;
+
 int gunyah_rm_notifier_register(struct gunyah_rm *rm,
 				struct notifier_block *nb);
 int gunyah_rm_notifier_unregister(struct gunyah_rm *rm,

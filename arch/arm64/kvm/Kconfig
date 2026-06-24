@@ -18,9 +18,42 @@ menuconfig VIRTUALIZATION
 
 if VIRTUALIZATION
 
+###################### Gunyah-based KVM ######################
+#
+# KVM-under-Gunyah: the KVM core (virt/kvm) is built with a Gunyah backend
+# (arch/arm64/kvm/gunyah.o) instead of the native EL2 hypervisor. Native KVM
+# (arm.c, hyp/, vgic) is disabled in this configuration.
+#
+menuconfig KVM
+	bool "Kernel-based Virtual Machine (KVM) under Gunyah"
+	depends on GUNYAH
+	select MMU_NOTIFIER
+	select PREEMPT_NOTIFIERS
+	select HAVE_KVM_EVENTFD
+	select HAVE_KVM_IRQFD
+	select HAVE_KVM_IRQCHIP
+	select KVM_MMIO
+	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+	select HAVE_KVM_MSI
+	select HAVE_KVM_IRQ_ROUTING
+	select KVM_XFER_TO_GUEST_WORK
+	select INTERVAL_TREE
+	select XARRAY_MULTI
+	help
+	  Support hosting virtualized guest machines under the Gunyah
+	  hypervisor, using the /dev/kvm userspace interface.
+
+	  If unsure, say N.
+
+###################### Native ARM KVM ######################
+config KVM_ARM
+	bool
+	depends on !GUNYAH
+
 menuconfig KVM
 	bool "Kernel-based Virtual Machine (KVM) support"
-	depends on HAVE_KVM
+	depends on !GUNYAH && HAVE_KVM
+	select KVM_ARM
 	select KVM_GENERIC_HARDWARE_ENABLING
 	select MMU_NOTIFIER
 	select PREEMPT_NOTIFIERS
@@ -47,6 +80,8 @@ menuconfig KVM
 	  Support hosting virtualized guest machines.
 
 	  If unsure, say N.
+
+if KVM_ARM
 
 config NVHE_EL2_DEBUG
 	bool "Debug mode for non-VHE EL2 object"
@@ -92,4 +127,5 @@ config PTDUMP_STAGE2_DEBUGFS
 
          If in doubt, say N.
 
+endif # KVM_ARM
 endif # VIRTUALIZATION

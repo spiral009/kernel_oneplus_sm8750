@@ -17,6 +17,8 @@ obj-$(CONFIG_GH_PANIC_NOTIFIER) += gh_panic_notifier.o
 obj-$(CONFIG_GH_RES_REQUEST) += gh_res_request.o
 obj-$(CONFIG_GH_GUEST_POPS)     += gh_guest_pops.o
 
+# Hybrid: native /dev/gunyah VM manager (vm_mgr/vcpu) restored ALONGSIDE the
+# KVM-under-Gunyah /dev/kvm path (arch/arm64/kvm/gunyah.o), so crosvm works.
 gunyah_rsc_mgr-y += rsc_mgr.o rsc_mgr_rpc.o vm_mgr.o vm_mgr_mem.o
 
 obj-$(CONFIG_GUNYAH) += gunyah.o gunyah_rsc_mgr.o gunyah_vcpu.o

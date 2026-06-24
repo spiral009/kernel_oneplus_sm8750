@@ -208,6 +208,10 @@ struct kvm_s2_mmu {
 };
 
 struct kvm_arch_memory_slot {
+#ifdef CONFIG_GUNYAH
+	/* KVM-under-Gunyah pins the memslot pages for the guest */
+	struct page **pages;
+#endif
 };
 
 /**
@@ -825,6 +829,11 @@ struct kvm_vcpu_arch {
 /* KVM_ARM_VCPU_INIT completed */
 #define VCPU_INITIALIZED	__vcpu_single_flag(cflags, BIT(3))
 
+#ifdef CONFIG_GUNYAH
+/* KVM-under-Gunyah: native arm.c (which defines this) is not built */
+#define kvm_vcpu_initialized(v) vcpu_get_flag(vcpu, VCPU_INITIALIZED)
+#endif
+
 /* Exception pending */
 #define PENDING_EXCEPTION	__vcpu_single_flag(iflags, BIT(0))
 /*
@@ -1294,7 +1303,8 @@ static inline bool kvm_pmu_counter_deferred(struct perf_event_attr *attr)
 void kvm_arch_vcpu_load_debug_state_flags(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_put_debug_state_flags(struct kvm_vcpu *vcpu);
 
-#ifdef CONFIG_KVM
+/* KVM-under-Gunyah: native PMU virtualization (pmu.c) is not built */
+#ifdef CONFIG_KVM_ARM
 void kvm_set_pmu_events(u32 set, struct perf_event_attr *attr);
 void kvm_clr_pmu_events(u32 clr);
 bool kvm_set_pmuserenr(u64 val);
@@ -1314,6 +1324,12 @@ int __init kvm_set_ipa_limit(void);
 
 #define __KVM_HAVE_ARCH_VM_ALLOC
 struct kvm *kvm_arch_alloc_vm(void);
+
+#ifdef CONFIG_GUNYAH
+/* KVM-under-Gunyah provides its own kvm_arch_free_vm() (frees gunyah_vm) */
+#define __KVM_HAVE_ARCH_VM_FREE
+void kvm_arch_free_vm(struct kvm *kvm);
+#endif
 
 #define __KVM_HAVE_ARCH_FLUSH_REMOTE_TLBS
 

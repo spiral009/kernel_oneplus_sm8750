@@ -8,6 +8,7 @@
 
 #include <linux/device.h>
 #include <linux/kref.h>
+#include <linux/kvm_host.h>
 #include <linux/maple_tree.h>
 #include <linux/mutex.h>
 #include <linux/pagemap.h>
@@ -105,6 +106,9 @@ long gunyah_dev_vm_mgr_ioctl(struct gunyah_rm *rm, unsigned int cmd,
  */
 struct gunyah_vm {
 	u16 vmid;
+	/* KVM-under-Gunyah: embedded kvm instance and start latch */
+	bool started;
+	struct kvm kvm;
 	struct maple_tree mm;
 	struct maple_tree bindings;
 	struct rw_semaphore bindings_lock;
@@ -144,6 +148,53 @@ struct gunyah_vm {
 	} fw;
 	struct xarray boot_context;
 };
+
+/*
+ * KVM-under-Gunyah vCPU. The KVM core allocates this via kvm_arch_vcpu_alloc()
+ * (see arch/arm64/kvm/gunyah.c) with kvm_vcpu as the first member.
+ */
+/*
+ * GUNYAH_VCPU_OEM_IMPL is defined by the native OEM vcpu driver
+ * (gunyah_vcpu.c), which has its own incompatible struct gunyah_vcpu. Guard
+ * afr0ck's KVM-based definition so the two can coexist in one kernel.
+ */
+#ifndef GUNYAH_VCPU_OEM_IMPL
+struct gunyah_vcpu {
+	struct kvm_vcpu kvm_vcpu;
+	struct gunyah_resource *rsc;
+	struct mutex lock;
+	struct gunyah_vm *ghvm;
+
+	/*
+	 * Track why the vcpu_run hypercall returned. This mirrors the vcpu_run
+	 * structure shared with userspace, except is used internally to avoid
+	 * trusting userspace to not modify the vcpu_run structure.
+	 */
+	enum {
+		GUNYAH_VCPU_RUN_STATE_UNKNOWN = 0,
+		GUNYAH_VCPU_RUN_STATE_READY,
+		GUNYAH_VCPU_RUN_STATE_MMIO_READ,
+		GUNYAH_VCPU_RUN_STATE_MMIO_WRITE,
+		GUNYAH_VCPU_RUN_STATE_SYSTEM_DOWN,
+	} state;
+
+	bool immediate_exit;
+	struct completion ready;
+
+	struct notifier_block nb;
+	struct gunyah_vm_resource_ticket ticket;
+};
+#endif /* !GUNYAH_VCPU_OEM_IMPL */
+
+#define gunyah_vcpu(kvm_vcpu_ptr) \
+	container_of(kvm_vcpu_ptr, struct gunyah_vcpu, kvm_vcpu)
+
+#define kvm_to_gunyah(kvm_ptr) \
+	container_of(kvm_ptr, struct gunyah_vm, kvm)
+
+#define GUNYAH_STATE(kvm_vcpu)							\
+	struct gunyah_vm __maybe_unused *ghvm = kvm_to_gunyah(kvm_vcpu->kvm);	\
+	struct gunyah_vcpu __maybe_unused *ghvcpu = gunyah_vcpu(kvm_vcpu)
 
 int gunyah_vm_mmio_write(struct gunyah_vm *ghvm, u64 addr, u32 len, u64 data);
 
