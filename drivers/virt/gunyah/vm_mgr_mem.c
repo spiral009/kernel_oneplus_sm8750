@@ -487,7 +487,13 @@ int gunyah_gup_share_parcel(struct gunyah_vm *ghvm, struct gunyah_rm_mem_parcel 
 	}
 
 	offset = gunyah_gfn_to_gpa(*gfn) - b->guest_phys_addr;
-	pages = kcalloc(*nr, sizeof(*pages), GFP_KERNEL_ACCOUNT);
+	/*
+	 * Large guests (e.g. Windows) can require hundreds of KiB just for the
+	 * pinned-page pointer array; use vmalloc fallback rather than a
+	 * high-order kmalloc that fragments and fails. Adapted from
+	 * Andy312432/android_kernel_samsung_sm8650_gunyah 3d8767092fa1.
+	 */
+	pages = kvcalloc(*nr, sizeof(*pages), GFP_KERNEL_ACCOUNT);
 	if (!pages) {
 		ret = -ENOMEM;
 		goto unlock;
@@ -549,8 +555,8 @@ int gunyah_gup_share_parcel(struct gunyah_vm *ghvm, struct gunyah_rm_mem_parcel 
 	}
 
 	/* overallocate & assume no large folios */
-	parcel->mem_entries = kcalloc(pinned, sizeof(parcel->mem_entries[0]),
-					GFP_KERNEL_ACCOUNT);
+	parcel->mem_entries = kvcalloc(pinned, sizeof(parcel->mem_entries[0]),
+				       GFP_KERNEL_ACCOUNT);
 	if (!parcel->mem_entries) {
 		ret = -ENOMEM;
 		goto free_acl;
@@ -582,7 +588,7 @@ int gunyah_gup_share_parcel(struct gunyah_vm *ghvm, struct gunyah_rm_mem_parcel 
 free_acl:
 	kfree(parcel->acl_entries);
 	parcel->acl_entries = NULL;
-	kfree(parcel->mem_entries);
+	kvfree(parcel->mem_entries);
 	parcel->mem_entries = NULL;
 	parcel->n_mem_entries = 0;
 unaccount_pages:
@@ -590,7 +596,7 @@ unaccount_pages:
 unpin_pages:
 	unpin_user_pages(pages, pinned);
 free_pages:
-	kfree(pages);
+	kvfree(pages);
 unlock:
 	up_read(&ghvm->bindings_lock);
 	return ret;

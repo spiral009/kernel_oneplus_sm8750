@@ -14,6 +14,16 @@
 #define QCOM_SCM_RM_MANAGED_VMID 0x3A
 #define QCOM_SCM_MAX_MANAGED_VMID 0x3F
 
+/* Declared in the private rsc_mgr.h, EXPORT_SYMBOL_GPL. */
+int gunyah_rm_get_vmid(struct gunyah_rm *rm, u16 *vmid);
+
+static u16 qcom_scm_map_vmid(u16 vmid)
+{
+	if (vmid <= QCOM_SCM_MAX_MANAGED_VMID)
+		return vmid;
+	return QCOM_SCM_RM_MANAGED_VMID;
+}
+
 static int
 qcom_scm_gunyah_rm_pre_mem_share(struct gunyah_rm *rm,
 				 struct gunyah_rm_mem_parcel *mem_parcel)
@@ -21,19 +31,20 @@ qcom_scm_gunyah_rm_pre_mem_share(struct gunyah_rm *rm,
 	struct qcom_scm_vmperm *new_perms __free(kfree) = NULL;
 	u64 src, src_cpy;
 	int ret = 0, i, n;
-	u16 vmid;
+	u16 self_vmid, vmid;
 
 	new_perms = kcalloc(mem_parcel->n_acl_entries, sizeof(*new_perms),
 			    GFP_KERNEL);
 	if (!new_perms)
 		return -ENOMEM;
 
+	ret = gunyah_rm_get_vmid(rm, &self_vmid);
+	if (ret)
+		return ret;
+
 	for (n = 0; n < mem_parcel->n_acl_entries; n++) {
 		vmid = le16_to_cpu(mem_parcel->acl_entries[n].vmid);
-		if (vmid <= QCOM_SCM_MAX_MANAGED_VMID)
-			new_perms[n].vmid = vmid;
-		else
-			new_perms[n].vmid = QCOM_SCM_RM_MANAGED_VMID;
+		new_perms[n].vmid = qcom_scm_map_vmid(vmid);
 		if (mem_parcel->acl_entries[n].perms & GUNYAH_RM_ACL_X)
 			new_perms[n].perm |= QCOM_SCM_PERM_EXEC;
 		if (mem_parcel->acl_entries[n].perms & GUNYAH_RM_ACL_W)
@@ -42,7 +53,7 @@ qcom_scm_gunyah_rm_pre_mem_share(struct gunyah_rm *rm,
 			new_perms[n].perm |= QCOM_SCM_PERM_READ;
 	}
 
-	src = BIT_ULL(QCOM_SCM_VMID_HLOS);
+	src = BIT_ULL(qcom_scm_map_vmid(self_vmid));
 
 	for (i = 0; i < mem_parcel->n_mem_entries; i++) {
 		src_cpy = src;
@@ -61,10 +72,7 @@ qcom_scm_gunyah_rm_pre_mem_share(struct gunyah_rm *rm,
 	src = 0;
 	for (n = 0; n < mem_parcel->n_acl_entries; n++) {
 		vmid = le16_to_cpu(mem_parcel->acl_entries[n].vmid);
-		if (vmid <= QCOM_SCM_MAX_MANAGED_VMID)
-			src |= BIT_ULL(vmid);
-		else
-			src |= BIT_ULL(QCOM_SCM_RM_MANAGED_VMID);
+		src |= BIT_ULL(qcom_scm_map_vmid(vmid));
 	}
 
 	new_perms[0].vmid = QCOM_SCM_VMID_HLOS;
@@ -97,10 +105,7 @@ qcom_scm_gunyah_rm_post_mem_reclaim(struct gunyah_rm *rm,
 
 	for (n = 0; n < mem_parcel->n_acl_entries; n++) {
 		vmid = le16_to_cpu(mem_parcel->acl_entries[n].vmid);
-		if (vmid <= QCOM_SCM_MAX_MANAGED_VMID)
-			src |= (1ull << vmid);
-		else
-			src |= (1ull << QCOM_SCM_RM_MANAGED_VMID);
+		src |= BIT_ULL(qcom_scm_map_vmid(vmid));
 	}
 
 	for (i = 0; i < mem_parcel->n_mem_entries; i++) {
